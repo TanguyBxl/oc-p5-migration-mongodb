@@ -221,3 +221,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Projet 5 - Secrets et données locales
+.env
+data/
+*.csv
