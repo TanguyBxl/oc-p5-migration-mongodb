@@ -62,3 +62,5 @@ docker compose logs migration
 
 # 3. VÃ©rifier l'Ã©tat des conteneurs (migration en Exited (0), mongodb en Up (healthy))
 docker compose ps -a
+## 5. Architecture Cloud (Microsoft Azure)
+Une étude d'architecture cible pour le déploiement de ce pipeline sur Microsoft Azure est disponible dans [docs/architecture-azure.md](docs/architecture-azure.md).
