@@ -45,3 +45,20 @@ python migrate.py
 
 # 4. Tester les opérations de base (Create, Read, Update, Delete)
 python crud_test.py
+
+## 4. Installation et exécution
+
+### Option A : Avec Docker Compose (recommandé)
+Le fichier `docker-compose.yml` orchestre deux conteneurs sur un réseau privé :
+* **`mongodb` (`healthcare-mongodb`) :** base MongoDB avec stockage persistant (`volume` `mongo_data`) et contrôle de santé (`healthcheck`).
+* **`migration` (`healthcare-migration`) :** image Python (`Dockerfile`) exécutant `migrate.py` via `MONGO_URI=mongodb://mongodb:27017/` dès que MongoDB est prêt.
+
+```powershell
+# 1. Construire l'image et lancer les conteneurs en arrière-plan
+docker compose up --build -d
+
+# 2. Contrôler le journal d'exécution de la migration
+docker compose logs migration
+
+# 3. Vérifier l'état des conteneurs (migration en Exited (0), mongodb en Up (healthy))
+docker compose ps -a

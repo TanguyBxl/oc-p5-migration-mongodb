@@ -1,4 +1,6 @@
 import pandas as pd
+import os
+from pymongo import MongoClient
 df = pd.read_csv("data/healthcare_dataset.csv")
 
 df.columns = df.columns.str.lower().str.strip()
@@ -18,9 +20,9 @@ df.columns = df.columns.str.replace(" ", "_")
 documents = df.to_dict(orient="records")
 
 
-from pymongo import MongoClient
 
-client = MongoClient("mongodb://localhost:27017/")
+mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
+client = MongoClient(mongo_uri)
 collection = client["healthcare_db"]["admissions"]
 
 collection.delete_many({})
@@ -32,3 +34,9 @@ print(f"Migration réussie : {nb_docs} documents insérés.")
 print(collection.find_one())
 
 client.close()
+
+
+
+
+
+
