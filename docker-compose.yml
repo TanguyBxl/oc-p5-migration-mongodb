@@ -2,25 +2,41 @@ services:
   mongodb:
     image: mongo:latest
     container_name: healthcare-mongodb
+    restart: unless-stopped
     ports:
       - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      ETL_USERNAME: ${ETL_USERNAME}
+      ETL_PASSWORD: ${ETL_PASSWORD}
+      ANALYST_USERNAME: ${ANALYST_USERNAME}
+      ANALYST_PASSWORD: ${ANALYST_PASSWORD}
     volumes:
       - mongo_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - healthcare_net
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet"]
-      interval: 5s
+      test: ["CMD-SHELL", "mongosh --quiet -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.adminCommand(\"ping\")'"]
+      interval: 10s
       timeout: 5s
       retries: 5
 
   migration:
     build: .
-    image: healthcare-migration:latest
     container_name: healthcare-migration
-    environment:
-      - MONGO_URI=mongodb://mongodb:27017/
     depends_on:
       mongodb:
         condition: service_healthy
+    environment:
+      MONGO_URI: mongodb://${ETL_USERNAME}:${ETL_PASSWORD}@mongodb:27017/healthcare_db?authSource=healthcare_db
+    networks:
+      - healthcare_net
 
 volumes:
   mongo_data:
+
+networks:
+  healthcare_net:
+    driver: bridge

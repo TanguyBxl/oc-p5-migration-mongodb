@@ -1,66 +1,29 @@
-# Migration de données médicales vers MongoDB
+# Migration de données médicales vers MongoDB (Docker & Python)
 
-## 1. Objectif du projet
-Ce projet permet de nettoyer et migrer un jeu de données hospitalières (`healthcare_dataset.csv`, 55 500 lignes) vers une base de données NoSQL MongoDB (`healthcare_db`, collection `admissions`) à l'aide de Python (`pandas` et `pymongo`).
+Pipeline ETL conteneurisé permettant de nettoyer, typifier et migrer un jeu de données hospitalières (CSV) vers **MongoDB**, avec gestion des accès par rôles (RBAC) et suite de tests automatisés.
 
-## 2. Logique de nettoyage et règles d'intégrité
-Avant l'insertion dans MongoDB, le script `migrate.py` applique les étapes suivantes :
-* **Normalisation :** Passage des noms de colonnes en minuscules avec underscores (`snake_case`) et conversion de toutes les valeurs texte en minuscules (`lowercase` + `strip`) *avant* la recherche de doublons.
-* **Dédoublonnage :** Suppression de **534 doublons exacts**, ce qui laisse **54 966 admissions** uniques.
-* **Typage des variables :** Conversion des dates (`date_of_admission` et `discharge_date`) via `pd.to_datetime()` pour les stocker au format natif **BSON `Date`** dans MongoDB, et arrondi de `billing_amount` à 2 décimales.
-* **Gestion des montants négatifs :** L'exploration (`explore.py`) a révélé **106 lignes avec un montant négatif**. Après vérification de l'historique des patients concernés, ces lignes ont été conservées car elles correspondent probablement à des remboursements ou des avoirs (en attente de confirmation du service facturation).
-* **Contrôle post-migration :** Le script vide la collection avant chaque insertion (`delete_many({})`) pour éviter les doublons en cas de réexécution, puis vérifie avec `assert` que les **54 966 documents** sont bien présents en base.
+## Architecture du projet
 
-## 3. Structure d'un document dans MongoDB
-Chaque ligne du CSV est convertie en un document JSON plat à 15 champs dans `healthcare_db.admissions` :
+* **`migrate.py`** : Script ETL Python (`pandas`, `pymongo`) assurant la normalisation des chaînes, la conversion des dates au format BSON `ISODate`, le dédoublonnage strict (54 966 enregistrements uniques conservés), l'insertion en base et la création des index.
+* **`Dockerfile` & `docker-compose.yml`** : Orchestration de deux services isolés sur le réseau bridge `healthcare_net` :
+  * `healthcare-mongodb` (`mongo:latest`) avec volume persistant (`mongo_data`) et `healthcheck` authentifié.
+  * `healthcare-migration` (`python:3.12-slim`) exécutant la migration dès que MongoDB est opérationnel.
+* **`mongo-init.js`** : Script d'initialisation créant deux utilisateurs dédiés sur `healthcare_db` selon le principe du moindre privilège :
+  * `etl_user` : rôle `readWrite` (utilisé par le pipeline ETL et les tests).
+  * `analyst_user` : rôle `read` (accès analytique en lecture seule).
+* **`test_migration.py`** : Suite de 5 tests automatisés avec `pytest` validant l'intégrité des données et le cycle CRUD.
+* **`.env.example`** : Modèle des variables d'environnement requises (les identifiants réels sont stockés dans `.env`, ignoré par Git).
 
-```json
-{
-  "name": "bobby jackson",
-  "age": 30,
-  "gender": "male",
-  "blood_type": "b-",
-  "medical_condition": "cancer",
-  "date_of_admission": "2024-01-31T00:00:00Z",
-  "doctor": "matthew smith",
-  "hospital": "sons and miller",
-  "insurance_provider": "blue cross",
-  "billing_amount": 18856.28,
-  "room_number": 328,
-  "admission_type": "urgent",
-  "discharge_date": "2024-02-02T00:00:00Z",
-  "medication": "paracetamol",
-  "test_results": "normal"
-}
+## Structure du dépôt
 
-# 1. Créer et activer l'environnement virtuel
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-# 2. Installer les dépendances
-pip install -r requirements.txt
-
-# 3. Lancer la migration vers MongoDB
-python migrate.py
-
-# 4. Tester les opérations de base (Create, Read, Update, Delete)
-python crud_test.py
-
-## 4. Installation et exécution
-
-### Option A : Avec Docker Compose (recommandé)
-Le fichier `docker-compose.yml` orchestre deux conteneurs sur un réseau privé :
-* **`mongodb` (`healthcare-mongodb`) :** base MongoDB avec stockage persistant (`volume` `mongo_data`) et contrôle de santé (`healthcheck`).
-* **`migration` (`healthcare-migration`) :** image Python (`Dockerfile`) exécutant `migrate.py` via `MONGO_URI=mongodb://mongodb:27017/` dès que MongoDB est prêt.
-
-```powershell
-# 1. Construire l'image et lancer les conteneurs en arrière-plan
-docker compose up --build -d
-
-# 2. Contrôler le journal d'exécution de la migration
-docker compose logs migration
-
-# 3. Vérifier l'état des conteneurs (migration en Exited (0), mongodb en Up (healthy))
-docker compose ps -a
-## 5. Architecture Cloud (Microsoft Azure)
-Une �tude d'architecture cible pour le d�ploiement de ce pipeline sur Microsoft Azure est disponible dans [docs/architecture-azure.md](docs/architecture-azure.md).
+```text
+├── data/                  # Dossier local pour le fichier CSV source (ignoré par Git)
+├── .env.example           # Modèle de configuration des identifiants
+├── .gitignore             # Exclusion des secrets (.env), données (.csv) et caches
+├── docker-compose.yml     # Orchestration des conteneurs, réseau et volume
+├── Dockerfile             # Image du service de migration Python
+├── migrate.py             # Script ETL et création des index
+├── mongo-init.js          # Création des utilisateurs RBAC MongoDB
+├── README.md              # Documentation du projet
+├── requirements.txt       # Dépendances Python
+└── test_migration.py      # Tests d'intégrité et CRUD (pytest)

@@ -28,6 +28,10 @@ collection = client["healthcare_db"]["admissions"]
 collection.delete_many({})
 collection.insert_many(documents)
 
+# Création des index pour accélérer les requêtes fréquentes
+collection.create_index("medical_condition")
+collection.create_index("date_of_admission")
+
 nb_docs = collection.count_documents({})
 assert nb_docs == len(documents), "Erreur : le nombre de documents ne correspond pas !"
 print(f"Migration réussie : {nb_docs} documents insérés.")
